@@ -5,6 +5,6 @@ Detail of labs is in [6.S081: Operation System Energineering](https://pdos.csail
 You can see the answers in corresponding branch.
 
 Process:
-[x] Lab1 util: Unix utilities
-[x] Lab2 syscall: System calls
-[ ] Lab3 pgtbl: Page tables
+- [x] Lab1 util: Unix utilities
+- [x] Lab2 syscall: System calls
+- [ ] Lab3 pgtbl: Page tables
