@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -132,7 +134,7 @@ kvmpa(uint64 va)
   pte_t *pte;
   uint64 pa;
   
-  pte = walk(kernel_pagetable, va, 0);
+  pte = walk(myproc()->kpagetable, va, 0);
   if(pte == 0)
     panic("kvmpa");
   if((*pte & PTE_V) == 0)
@@ -439,4 +441,36 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void printwalk(pagetable_t pagetable, uint level) {
+  char* prefix;
+  if (level == 2) prefix = "..";
+  else if (level == 1) prefix = ".. ..";
+  else prefix = ".. .. ..";
+
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      uint64 pa = PTE2PA(pte);
+      printf("%s%d: pte %p pa %p\n", prefix, i, pte, pa);
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        printwalk((pagetable_t)pa, level - 1);
+      }
+    }
+  }
+}
+
+void
+vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  printwalk(pagetable, 2);
+}
+
+// add a mapping to the user kernel page table.
+void
+ukvmmap(pagetable_t pagetable ,uint64 va, uint64 pa, uint64 sz, int perm)
+{
+  if(mappages(pagetable, va, sz, pa, perm) != 0)
+    panic("ukvmmap");
 }

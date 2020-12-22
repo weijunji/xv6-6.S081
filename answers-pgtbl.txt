@@ -1,0 +1,4 @@
+page 0 is the code of the program init.
+page 2 is the stack of this process.
+page 1 is the guard page which the process could not read/write.
+
