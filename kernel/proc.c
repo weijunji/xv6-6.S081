@@ -114,7 +114,7 @@ found:
   }
 
   // create the kernel page table.
-  p->kpagetable = proc_kpagetable();
+  p->kpagetable = proc_kpagetable(p);
   if(p->kpagetable == 0){
     freeproc(p);
     release(&p->lock);
@@ -207,7 +207,7 @@ proc_pagetable(struct proc *p)
 extern char etext[];
 
 pagetable_t
-proc_kpagetable() {
+proc_kpagetable(struct proc *p) {
   pagetable_t kpagetable;
   kpagetable = uvmcreate();
   if(kpagetable == 0)
@@ -215,11 +215,11 @@ proc_kpagetable() {
 
   ukvmmap(kpagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
   ukvmmap(kpagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
-  ukvmmap(kpagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
   ukvmmap(kpagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
   ukvmmap(kpagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
   ukvmmap(kpagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
   ukvmmap(kpagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  ukvmmap(kpagetable, TRAPFRAME, (uint64)(p->trapframe), PGSIZE, PTE_R | PTE_W);
 
   return kpagetable;
 }
@@ -276,6 +276,8 @@ userinit(void)
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  ukvmcopy(p->pagetable, p->kpagetable, 0, p->sz);
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -298,11 +300,15 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+    if (PGROUNDUP(sz + n) >= PLIC)
+      return -1;
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    ukvmcopy(p->pagetable, p->kpagetable, sz - n, sz);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
+    ukvmcopy(p->pagetable, p->kpagetable, sz, sz - n);
   }
   p->sz = sz;
   return 0;
@@ -329,6 +335,8 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  ukvmcopy(np->pagetable, np->kpagetable, 0, np->sz);
 
   np->parent = p;
 

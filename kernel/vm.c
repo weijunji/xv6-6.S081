@@ -381,23 +381,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
-
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
-
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -407,40 +391,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
-  int got_null = 0;
-
-  while(got_null == 0 && max > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > max)
-      n = max;
-
-    char *p = (char *) (pa0 + (srcva - va0));
-    while(n > 0){
-      if(*p == '\0'){
-        *dst = '\0';
-        got_null = 1;
-        break;
-      } else {
-        *dst = *p;
-      }
-      --n;
-      --max;
-      p++;
-      dst++;
-    }
-
-    srcva = va0 + PGSIZE;
-  }
-  if(got_null){
-    return 0;
-  } else {
-    return -1;
-  }
+  return copyinstr_new(pagetable, dst, srcva, max);
 }
 
 void printwalk(pagetable_t pagetable, uint level) {
@@ -473,4 +424,26 @@ ukvmmap(pagetable_t pagetable ,uint64 va, uint64 pa, uint64 sz, int perm)
 {
   if(mappages(pagetable, va, sz, pa, perm) != 0)
     panic("ukvmmap");
+}
+
+// copy page table
+void
+ukvmcopy(pagetable_t pagetable, pagetable_t kpagetable, uint64 oldsz, uint64 newsz)
+{
+  pte_t *src, *dest;
+  uint64 cur;
+
+  if (newsz < oldsz)
+    return;
+
+  oldsz = PGROUNDUP(oldsz);
+  for(cur = oldsz; cur < newsz; cur += PGSIZE){
+    if ((src = walk(pagetable, cur, 0)) == 0)
+      panic("ukvmcopy: pte not exist");
+    if ((dest = walk(kpagetable, cur, 1)) == 0)
+      panic("ukvmcopy: pte alloc failed");
+    
+    uint64 pa = PTE2PA(*src);
+    *dest = PA2PTE(pa) | (PTE_FLAGS(*src) & (~PTE_U));
+  }
 }
