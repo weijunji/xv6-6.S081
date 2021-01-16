@@ -192,6 +192,8 @@ sys_unlink(void)
   if(argstr(0, path, MAXPATH) < 0)
     return -1;
 
+  printf("unlink: %s", path);
+
   begin_op();
   if((dp = nameiparent(path, name)) == 0){
     end_op();
