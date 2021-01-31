@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -156,8 +158,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_V)
-      panic("remap");
+    // if(*pte & PTE_V)
+    //   panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -311,7 +313,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -320,13 +321,14 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+
+    *pte = ((*pte) & (~PTE_W)) | PTE_COW; // set parent's page unwritable
+    // printf("c: %p %p %p\n", i, ((flags & (~PTE_W)) | PTE_COW), *pte);
+    // map child's page with page unwritable
+    if(mappages(new, i, PGSIZE, (uint64)pa, (flags & (~PTE_W)) | PTE_COW) != 0){
       goto err;
     }
+    refcnt_incr(pa, 1);
   }
   return 0;
 
@@ -358,7 +360,18 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    if(va0 >= MAXVA)
+      return -1;
+    pte_t* pte = walk(pagetable, va0, 0);
+    if(pte && (*pte & PTE_COW) != 0){
+      // cow page
+      if(cowcopy(va0) != 0){
+        return -1;
+      }
+    }
     pa0 = walkaddr(pagetable, va0);
+
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
@@ -439,4 +452,45 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int
+cowcopy(uint64 va){
+  va = PGROUNDDOWN(va);
+  pagetable_t p = myproc()->pagetable;
+  pte_t* pte = walk(p, va, 0);
+  uint64 pa = PTE2PA(*pte);
+  uint flags = PTE_FLAGS(*pte);
+
+  // printf("w: %p %p %p\n", va, flags, *pte);
+
+  if(!(flags & PTE_COW)){
+    printf("not cow\n");
+    return -2; // not cow page
+  }
+
+  acquire_refcnt();
+  uint ref = refcnt_getter(pa);
+  // printf("%d\n", *ref);
+  if(ref > 1){
+    // ref > 1, alloc a new page
+    char* mem = kalloc_nolock();
+    if(mem == 0)
+      goto bad;
+    memmove(mem, (char*)pa, PGSIZE);
+    if(mappages(p, va, PGSIZE, (uint64)mem, (flags & (~PTE_COW)) | PTE_W) != 0){
+      kfree(mem);
+      goto bad;
+    }
+    refcnt_setter(pa, ref - 1);
+  }else{
+    // ref = 1, use this page directly
+    *pte = ((*pte) & (~PTE_COW)) | PTE_W;
+  }
+  release_refcnt();
+  return 0;
+
+  bad:
+  release_refcnt();
+  return -1;
 }
