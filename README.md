@@ -11,6 +11,7 @@ Process:
 - [x] Lab4 traps: Trap
 - [x] Lab5 lazy: Lazy allocation
 - [x] Lab6 cow: Copy-on-write fork
+- [x] Lab7 thread: Multithreading
 
 学习笔记：
 * [XV6学习(1) Lab util](https://juejin.cn/post/6908529535268945928)
@@ -21,4 +22,6 @@ Process:
 * [XV6学习 (6) Lab traps](https://juejin.cn/post/6914474081278656520)
 * [XV6学习 (7) Lab lazy](https://juejin.cn/post/6918311586427830286)
 * [XV6学习（8）中断和设备驱动](https://juejin.cn/post/6923380387544563725)
-* [XV6学习（9）Lab cow](https://juejin.cn/post/6923770778202669069/)
+* [XV6学习（9）Lab cow](https://juejin.cn/post/6923770778202669069)
+* [XV6学习（10）锁](https://juejin.cn/post/6925611020417237000)
+* [XV6学习（11）Lab thread: Multithreading](https://juejin.cn/post/6925769560624726029)
