@@ -120,7 +120,10 @@ bget(uint dev, uint blockno)
     int ridx = hash(replace_buf->dev, replace_buf->blockno);
     acquire(&hashtable[ridx].lock);
     if(replace_buf->refcnt != 0)  // be used in another bucket's local find between finded and acquire
+    {
+      release(&hashtable[ridx].lock);
       goto refind;
+    }
     struct buf *pre = &hashtable[ridx].head;
     struct buf *p = hashtable[ridx].head.next;
     while (p != replace_buf) {
