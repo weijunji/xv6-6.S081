@@ -21,12 +21,16 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
-} kmem;
+  char lock_name[7];
+} kmem[NCPU];
 
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
+  for (int i = 0; i < NCPU; i++) {
+    snprintf(kmem[i].lock_name, sizeof(kmem[i].lock_name), "kmem_%d", i);
+    initlock(&kmem[i].lock, kmem[i].lock_name);
+  }
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -56,10 +60,15 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  push_off();
+  int id = cpuid();
+
+  acquire(&kmem[id].lock);
+  r->next = kmem[id].freelist;
+  kmem[id].freelist = r;
+  release(&kmem[id].lock);
+
+  pop_off();
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -70,11 +79,56 @@ kalloc(void)
 {
   struct run *r;
 
-  acquire(&kmem.lock);
-  r = kmem.freelist;
-  if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+  push_off();
+  int id = cpuid();
+
+  acquire(&kmem[id].lock);
+  r = kmem[id].freelist;
+  if(r) {
+    kmem[id].freelist = r->next;
+  }
+  else {
+    // alloc failed, try to steal from other cpu
+    int success = 0;
+    int i = 0;
+    for(i = 0; i < NCPU; i++) {
+      if (i == id) continue;
+      acquire(&kmem[i].lock);
+      struct run *p = kmem[i].freelist;
+      if(p) {
+        // steal half of memory
+        // printf("%d steal from %d\n", id, i);
+        struct run *fp = p; // faster pointer
+        struct run *pre = p;
+        while (fp && fp->next) {
+          fp = fp->next->next;
+          pre = p;
+          p = p->next;
+        }
+        kmem[id].freelist = kmem[i].freelist;
+        if (p == kmem[i].freelist) {
+          // only have one page
+          kmem[i].freelist = 0;
+        }
+        else {
+          kmem[i].freelist = p;
+          pre->next = 0;
+        }
+        success = 1;
+      }
+      release(&kmem[i].lock);
+      if (success) {
+        r = kmem[id].freelist;
+        kmem[id].freelist = r->next;
+        break;
+      }
+    }
+    // if (i == NCPU) {
+    //   printf("alloc failed in %d: r=%p\n", id, r);
+    // }
+  }
+  release(&kmem[id].lock);
+  pop_off();
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
