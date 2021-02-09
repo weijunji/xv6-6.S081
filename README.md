@@ -12,6 +12,8 @@ Process:
 - [x] Lab5 lazy: Lazy allocation
 - [x] Lab6 cow: Copy-on-write fork
 - [x] Lab7 thread: Multithreading
+- [x] Lab8 lock: Parallelism/locking
+- [x] Lab9 fs: File system
 
 学习笔记：
 * [XV6学习(1) Lab util](https://juejin.cn/post/6908529535268945928)
@@ -25,3 +27,6 @@ Process:
 * [XV6学习（9）Lab cow](https://juejin.cn/post/6923770778202669069)
 * [XV6学习（10）锁](https://juejin.cn/post/6925611020417237000)
 * [XV6学习（11）Lab thread: Multithreading](https://juejin.cn/post/6925769560624726029)
+* [XV6学习（12）Lab lock: Parallelism/locking](https://juejin.cn/post/6926103573923266573)
+* [XV6学习（13）调度](https://juejin.cn/post/6926868726650241038)
+* [XV6学习（14）Lab fs: File system](https://juejin.cn/post/6927234467928997896)
