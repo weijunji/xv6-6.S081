@@ -15,6 +15,7 @@ Process:
 - [x] Lab8  lock: Parallelism/locking
 - [x] Lab9  fs: File system
 - [x] Lab10 mmap: Mmap
+- [x] Lab11 net: Network stack
 
 学习笔记：
 * [XV6学习(1) Lab util](https://juejin.cn/post/6908529535268945928)
@@ -32,3 +33,4 @@ Process:
 * [XV6学习（13）调度](https://juejin.cn/post/6926868726650241038)
 * [XV6学习（14）Lab fs: File system](https://juejin.cn/post/6927234467928997896)
 * [XV6学习（15）Lab mmap: Mmap](https://juejin.cn/post/6927480080553738254)
+* [XV6学习（16）Lab net: Network stack](https://juejin.cn/post/6927583722485055501)
