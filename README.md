@@ -5,15 +5,16 @@ Detail of labs is in [6.S081: Operation System Energineering](https://pdos.csail
 You can see the answers in corresponding branch.
 
 Process:
-- [x] Lab1 util: Unix utilities
-- [x] Lab2 syscall: System calls
-- [x] Lab3 pgtbl: Page tables
-- [x] Lab4 traps: Trap
-- [x] Lab5 lazy: Lazy allocation
-- [x] Lab6 cow: Copy-on-write fork
-- [x] Lab7 thread: Multithreading
-- [x] Lab8 lock: Parallelism/locking
-- [x] Lab9 fs: File system
+- [x] Lab1  util: Unix utilities
+- [x] Lab2  syscall: System calls
+- [x] Lab3  pgtbl: Page tables
+- [x] Lab4  traps: Trap
+- [x] Lab5  lazy: Lazy allocation
+- [x] Lab6  cow: Copy-on-write fork
+- [x] Lab7  thread: Multithreading
+- [x] Lab8  lock: Parallelism/locking
+- [x] Lab9  fs: File system
+- [x] Lab10 mmap: Mmap
 
 学习笔记：
 * [XV6学习(1) Lab util](https://juejin.cn/post/6908529535268945928)
@@ -30,3 +31,4 @@ Process:
 * [XV6学习（12）Lab lock: Parallelism/locking](https://juejin.cn/post/6926103573923266573)
 * [XV6学习（13）调度](https://juejin.cn/post/6926868726650241038)
 * [XV6学习（14）Lab fs: File system](https://juejin.cn/post/6927234467928997896)
+* [XV6学习（15）Lab mmap: Mmap](https://juejin.cn/post/6927480080553738254)
