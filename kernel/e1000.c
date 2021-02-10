@@ -102,19 +102,58 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
+  acquire(&e1000_lock);
+
+  uint32 idx = regs[E1000_TDT];
+  struct tx_desc* desc = &tx_ring[idx];
+
+  if((desc->status & E1000_TXD_STAT_DD) == 0){
+    release(&e1000_lock);
+    printf("buffer overflow\n");
+    return -1;
+  }
+
+  if(tx_mbufs[idx])
+    mbuffree(tx_mbufs[idx]);
   
+  desc->addr = (uint64)m->head;
+  desc->length = m->len;
+  desc->cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
+  tx_mbufs[idx] = m;
+
+  regs[E1000_TDT] = (idx + 1) % TX_RING_SIZE;
+  __sync_synchronize();
+  release(&e1000_lock);
   return 0;
 }
 
 static void
 e1000_recv(void)
 {
-  //
-  // Your code here.
-  //
-  // Check for packets that have arrived from the e1000
-  // Create and deliver an mbuf for each packet (using net_rx()).
-  //
+  int idx = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+  struct rx_desc* desc = &rx_ring[idx];
+
+  while(desc->status & E1000_RXD_STAT_DD){
+    acquire(&e1000_lock);
+
+    struct mbuf *buf = rx_mbufs[idx];
+    mbufput(buf, desc->length);
+    
+    rx_mbufs[idx] = mbufalloc(0);
+    if (!rx_mbufs[idx])
+      panic("mbuf alloc failed");
+    desc->addr = (uint64) rx_mbufs[idx]->head;
+    desc->status = 0;
+
+    regs[E1000_RDT] = idx;
+    __sync_synchronize();
+    release(&e1000_lock);
+
+    net_rx(buf);
+    
+    idx = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+    desc = &rx_ring[idx];
+  }
 }
 
 void
