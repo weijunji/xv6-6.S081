@@ -484,3 +484,107 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  uint64 addr;
+  int length, prot, flags, fd, offset;
+  if(argaddr(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &offset) < 0){
+    return -1;
+  }
+
+  if(addr != 0)
+    panic("mmap: addr not 0");
+  if(offset != 0)
+    panic("mmap: offset not 0");
+
+  struct proc *p = myproc();
+  struct file* f = p->ofile[fd];
+
+  int pte_flag = PTE_U;
+  if (prot & PROT_WRITE) {
+    if(!f->writable && !(flags & MAP_PRIVATE)) return -1; // map to a unwritable file with PROT_WRITE
+    pte_flag |= PTE_W;
+  }
+  if (prot & PROT_READ) {
+    if(!f->readable) return -1; // map to a unreadable file with PROT_READ
+    pte_flag |= PTE_R;
+  }
+
+  struct vma* v = vma_alloc();
+  v->permission = pte_flag;
+  v->length = length;
+  v->off = offset;
+  v->file = myproc()->ofile[fd];
+  v->flags = flags;
+  filedup(f);
+  struct vma* pv = p->vma;
+  if(pv == 0){
+    v->start = VMA_START;
+    v->end = v->start + length;
+    p->vma = v;
+  }else{
+    while(pv->next) pv = pv->next;
+    v->start = PGROUNDUP(pv->end);
+    v->end = v->start + length;
+    pv->next = v;
+    v->next = 0;
+  }
+  addr = v->start;
+  printf("mmap: [%p, %p)\n", addr, v->end);
+
+  release(&v->lock);
+  return addr;
+}
+
+uint64
+sys_munmap(void)
+{
+  uint64 addr;
+  int length;
+  if(argaddr(0, &addr) < 0 || argint(1, &length) < 0){
+    return -1;
+  }
+
+  struct proc *p = myproc();
+  struct vma *v = p->vma;
+  struct vma *pre = 0;
+  while(v != 0){
+    if(addr >= v->start && addr < v->end) break; // found
+    pre = v;
+    v = v->next;
+  }
+
+  if(v == 0) return -1; // not mapped
+  printf("munmap: %p %d\n", addr, length);
+  if(addr != v->start && addr + length != v->end) panic("munmap middle of vma");
+
+  if(addr == v->start){
+    writeback(v, addr, length);
+    uvmunmap(p->pagetable, addr, length / PGSIZE, 1);
+    if(length == v->length){
+      // free all
+      fileclose(v->file);
+      if(pre == 0){
+        p->vma = v->next; // head
+      }else{
+        pre->next = v->next;
+        v->next = 0;
+      }
+      acquire(&v->lock);
+      v->length = 0;
+      release(&v->lock);
+    }else{
+      // free head
+      v->start -= length;
+      v->off += length;
+      v->length -= length;
+    }
+  }else{
+    // free tail
+    v->length -= length;
+    v->end -= length;
+  }
+  return 0;
+}
